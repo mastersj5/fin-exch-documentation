@@ -1,0 +1,46 @@
+@startuml
+!$BGCOLOR="black"
+
+!include https://raw.githubusercontent.com/bschwarz/puml-themes/master/themes/cyborg/puml-theme-cyborg.puml
+
+participant "Start of Day Loader" as Loader
+
+database MongoDB
+
+participant "Kafka Command Channel" as KafkaCmd
+
+
+participant "Event Stream Sequencer" as Sequencer
+
+
+participant "Kafka Event Channel" as KafkaEvt
+
+
+participant "MessageProducer" as Producer
+
+
+participant "MessageConsumer" as Consumer
+
+
+Loader -> MongoDB : Retrieve Stocks data
+
+MongoDB --> Loader : Stock data
+Loader -> Loader : Prepare Command Header\nfor Stock
+Loader -> Loader : Transform Stock data to JSON
+Loader -> Producer : Send(Stock JSON)
+
+activate Producer #blue
+
+Producer -> KafkaCmd : Publish Stock data
+
+deactivate Producer
+
+KafkaCmd -> Sequencer : Process Stock data
+Sequencer -> KafkaEvt : Emit Acknowledgment Event
+
+KafkaEvt -> Consumer : Listen to Acknowledgment
+activate Consumer #red
+Consumer --> Loader : Acknowledgment received
+deactivate Consumer
+
+@enduml

@@ -1,0 +1,20 @@
+@startuml
+!$BGCOLOR="black"
+
+!include https://raw.githubusercontent.com/bschwarz/puml-themes/master/themes/cyborg/puml-theme-cyborg.puml
+
+participant "Other Microservices" as Microservices
+participant "Kafka Command Channel" as KafkaCmd
+participant "ESS MessageConsumer" as Consumer
+participant "ESS Event Header Creation" as HeaderCreation
+database "ESS Object Storage" as Storage
+participant "Kafka Event Channel" as KafkaEvt
+
+Microservices->KafkaCmd: Send Command
+KafkaCmd->Consumer: Receive Command
+Consumer->HeaderCreation: Create Event Header
+Consumer->Storage: Update/Create Object
+HeaderCreation->KafkaEvt: Emit Event
+KafkaEvt->Microservices: Receive Event Update
+
+@enduml

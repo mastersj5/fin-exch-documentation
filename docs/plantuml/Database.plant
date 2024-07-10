@@ -1,0 +1,84 @@
+@startuml
+' hide the spot
+' hide circle
+
+' avoid problems with angled crows feet
+skinparam linetype ortho
+
+entity "Stock" as STOCK{
+        +symbol: string  
+        +name: string 
+        +minTickSize: double 
+        +minPrice: double 
+        +maxPrice: double 
+        +productID: int
+    }
+
+entity "Firm" as FIRM{
+        +MPID: string 
+        +name: string
+        +firmID: int
+    }
+
+
+entity "User" as USER{
+  +username: string
+  +name: string
+  +MPID: string
+  +userPermissions: string
+  +password: string
+  +userID: int
+}
+
+entity "Firm_Risk" as FIRM_RISK{
+  +userID: int
+  +maxOrderNotional: int
+  +maxCapital: int
+}
+
+entity "User_Risk" as USER_RISK{
+  +userID: int
+  +maxOrderNotional: int
+  +maxCapital: int
+}
+
+entity "Position" as POSITION{
+  +user: string
+  +stock: string
+  +quantity: int
+  +costBasis: double
+  +positionID: int
+}
+
+entity "Order" as ORDER{
+  +side: char
+  +quantity: int
+  +productID: int
+  +orderType: char
+  +orderStatus: string
+  +price: double
+  +time: string
+  +originalQuantity: int
+  +userID: int
+  +orderID: int
+}
+
+entity "Execution" as EXECUTION{
+  +execQuantity: int
+  +execPrice: double
+  +orderID: int
+  +matchID: int
+}
+
+
+
+USER }o--||  FIRM 
+FIRM ||--|| FIRM_RISK
+USER||--|| USER_RISK
+USER ||--o{ POSITION
+POSITION }o--|| STOCK
+USER ||--o{ ORDER
+ORDER  }o--|| STOCK
+ ORDER ||--o{ EXECUTION 
+
+@enduml

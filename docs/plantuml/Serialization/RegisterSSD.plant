@@ -1,0 +1,75 @@
+@startuml
+actor User as user
+participant "Iceberg UI" as ice
+participant "Client\nExchange Port" as server
+participant "Kafka\nCommand Channel" as command
+participant "Event Stream\nSequencer" as ess
+participant "Kafka\nEvent Channel" as event
+participant "Database\nWriter" as writer
+participant "DataLayer\nMongoDB" as db
+
+user -> ice: submit(username, name, password, password2)
+
+group Input Validation [failed]
+    ice--> user: displayError()
+    activate ice#red
+else passed
+    ice-> server: register(username, name, password, password2)
+    activate server #blue
+    server -> db: checkUsername(username)
+end
+
+group Input Validation [failed]
+    db --> server: userExists
+    server --> ice: invalid input
+    ice--> user: displayError()
+else passed
+    server -> server: user := (username, name, password)
+    server -> server: header := ("CEM", CSN, LocalDateTime.now(),\n FinExCommandType.CreateUser, user)
+    activate command #lightblue
+    server -> command: SendCommand(header)
+
+    activate ess #blue
+    command <- ess: listen(message)
+    ess -> ess: commandHeader :=\n deSerializeObjectFromByteArray(message)
+    ess -> ess: user := commandHeader.getContent()
+
+    ess -> ess: user.setUserID(userID)
+    ess -> ess: header := (commandHeader, ESN,\n FinExCommandType.PendingUserCreate, user)
+    activate event #lightblue
+    ess -> event: SendEvent(header)
+
+    activate writer #blue
+    event <- writer: listen(message)
+
+    writer -> writer: eventHeader :=\n deSerializeObjectFromByteArray(message)
+    writer -> writer: user := eventHeader.getContent()
+
+    ess -> ess: header := (commandHeader, ESN,\n FinExCommandType.UserCreated, userID)
+    ess -> event: SendEvent(header)
+
+    event <- writer: listen(message)
+    deactivate ess
+
+    writer -> writer: eventHeader :=\n deSerializeObjectFromByteArray(message)
+    writer -> writer: userID := eventHeader.getContent()
+    writer -> writer: user := usersArray.get(userID)
+
+    writer -> db: save(user)
+
+    server -> event: CheckEvent("CEM", CSN)
+    deactivate writer
+    server -> db: user:= findByUsername(username)
+    deactivate event
+    server -> server: userRisk := (10000, 100000, user.getUserID())
+    server -> server: header := ("CEM", CSN, LocalDateTime.now(),\n FinExCommandType.CreateUserRisk, userRisk)
+    server -> command: SendCommand(header)
+
+    server -> ice: valid user
+    deactivate command
+    ice--> user: displayHomeScreen()
+    deactivate server
+end
+
+deactivate ice
+@enduml

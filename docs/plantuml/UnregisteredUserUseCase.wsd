@@ -1,0 +1,11 @@
+@startuml
+left to right direction
+actor "Unregistered User" as user
+
+rectangle "Landing Page" {
+  usecase "Sign Up" as UC1
+}
+
+user --> UC1
+
+@enduml

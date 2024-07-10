@@ -1,0 +1,13 @@
+@startuml
+actor User as user
+participant "ClientHandler\nJavascript" as javascript
+
+activate javascript #red
+user -> javascript: logout()
+javascript -> javascript: destroySession()
+note right
+Removes the token from the browser's localstorage,
+effectively revoking access.
+end note
+deactivate javascript
+@enduml

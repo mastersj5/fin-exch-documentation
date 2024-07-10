@@ -1,0 +1,35 @@
+@startuml
+left to right direction
+actor "Admin" as user
+
+rectangle "Landing Page" {
+  usecase "Sign Up" as UC0
+  usecase "Login" as UC1
+}
+
+rectangle "Order Entry Website" {
+  
+  usecase "Update Personal Information" as UC2
+  usecase "Browse Available Stocks" as UC3
+  usecase "View Account Information" as UC4
+  usecase "Create Order" as UC5
+  usecase "Cancel Order" as UC7
+  usecase "View Personal Order Status" as UC8
+  usecase "Logout" as UC9
+  usecase "View Detailed Book" as UC10
+  usecase "View Data Page" as UC11
+}
+
+user --> UC0
+user --> UC1
+user --> UC2
+user --> UC3
+user --> UC4
+user --> UC5
+user --> UC7
+user --> UC8
+user --> UC9
+user --> UC10
+user --> UC11
+
+@enduml

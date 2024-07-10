@@ -1,0 +1,154 @@
+@startuml
+actor User as user
+participant "Iceberg UI" as ice
+participant "Client\nExchange Port" as server
+participant "Kafka\nCommand Channel" as command
+participant "Event Stream\nSequencer" as ess
+participant "Kafka\nEvent Channel" as event
+participant "Matching\nEngine" as mem
+participant "Database\nWriter" as writer
+participant "DataLayer\nMongoDB" as db
+
+user -> ice: submit(symbol, quantity, price)
+
+group Input Validation [failed]
+    ice--> user: displayError()
+    activate ice#red
+else passed
+    ice-> server: createOrder(orderbody)
+    activate server #blue
+    server -> db: userID := findByUsername(orderBody.getUsername()).getUserID()
+    server -> db: productID := getStockBySymbol(orderBody.getSymbol()).getProductID()
+    server -> server: order := createFinalOrder(orderBody, userID, productID)
+
+    server -> server: header := ("CEM", CSN, LocalDateTime.now(),\n FinExCommandType.CreateOrder, order);
+    activate command #lightblue
+    server -> command: SendCommand(header)
+
+    activate ess #blue
+    command <- ess: listen(message)
+    ess -> ess: commandHeader :=\n deSerializeObjectFromByteArray(message)
+    ess -> ess: order := commandHeader.getContent()
+    ess -> ess: order.setOrderID(orderID)
+
+
+
+    alt !validateOrder(order)
+        ess -> ess: header := (commandHeader, ESN,\n FinExCommandType.OrderRejected, order)
+    else
+        ess -> ess: header := (commandHeader, ESN,\n FinExCommandType.PendingOrderAccept, order)
+    end
+
+
+
+
+    ess -> event: SendEvent(header)
+    activate event #lightblue
+
+    activate writer #blue
+    event <- writer: listen(message)
+
+    writer -> writer: eventHeader :=\n deSerializeObjectFromByteArray(message)
+    writer -> writer: order := eventHeader.getContent()
+    writer -> writer: ordersArray.set(order.getOrderID(), order)
+
+
+
+    activate mem #blue
+    event <- mem: listen(message)
+
+
+    mem-> mem: eventHeader :=\n deSerializeObjectFromByteArray(message)
+    mem-> mem: orderID := eventHeader.getContent()
+    mem-> mem: executionList := books.get(order.getProductID()).insert(order)
+    mem-> mem: commandHeader := ("MEM", CSN, LocalDateTime.now(),\n FinExCommandType.CreateOrder, order);
+    mem-> command: SendCommand (    commandHeader)
+
+
+
+    command <- ess: listen(message)
+    ess -> ess: commandHeader :=\n deSerializeObjectFromByteArray(message)
+    ess -> ess: order := commandHeader.getContent()
+
+    ess-> ess: oldOrderQuantity :=\nordersArray.get(order.getOrderID()).getQuantity()
+    alt order.getOrderType() == 'M'
+        alt order.getQuantity() == oldOrderQuantity
+            ess -> ess: header := (commandHeader, ESN,\n FinExCommandType.OrderRejected, orderID)
+        else order.getQuantity() < oldOrderQuantity && order.getQuantity() != 0
+            ess -> ess: header := (commandHeader, ESN,\n FinExCommandType.OrderUnsolicitedlyCancelled, orderID)
+        else
+            ess -> ess: header := (commandHeader, ESN,\n FinExCommandType.OrderAccepted, orderID)
+        end
+    else 
+        ess -> ess: header := (commandHeader, ESN,\n FinExCommandType.PendingOrderAccept, orderID)
+    end
+
+
+
+    ess -> ess: header := (commandHeader, ESN,\n FinExCommandType.orderAccpeted, orderID)
+    ess -> event: SendEvent(header)
+
+
+
+    event <- writer: listen(message)
+
+
+    writer -> writer: eventHeader :=\n deSerializeObjectFromByteArray(message)
+    writer -> writer: orderID := eventHeader.getContent()
+    writer -> writer: order := ordersArray.get(orderID)
+
+    writer -> db: save(order)
+
+
+
+
+
+    server -> event: CheckEvent("CEM", CSN)
+
+
+
+    loop for each execution in executionList
+        mem-> mem: commandHeader := ("MEM", CSN, LocalDateTime.now(),\n FinExCommandType.CreateExecution, execution);
+        mem-> command: SendCommand (    commandHeader)
+    end
+
+
+
+    command <- ess: listen(message)
+    deactivate mem
+    ess -> ess: commandHeader :=\n deSerializeObjectFromByteArray(message)
+    deactivate command
+    ess -> ess: order := commandHeader.getContent()
+
+    ess-> ess: UpdateOrders(execution)
+    ess-> ess: UpdatePosition(execution)
+    ess-> ess: execution.setMatchID(matchID)
+    ess-> ess: UpdateUserCapital(execution)
+    ess-> ess: UpdatefirmCapital(execution)
+
+    ess-> ess: eventHeader := (commandHeader, ESN, FinExEventType.Execution, execution)
+    ess-> event: SendEvent(eventHeader)
+
+
+
+    event <- writer: listen(message)
+    deactivate ess
+
+    writer -> writer: eventHeader :=\n deSerializeObjectFromByteArray(message)
+    deactivate event
+    writer -> writer: execution := eventHeader.getContent()
+    writer -> db: UpdatePosition(execution)
+    writer -> db: save(execution)
+
+    writer -> db: UpdateOrder(execution)
+
+    deactivate writer
+
+
+    server --> ice: valid order
+    ice--> user: displayOrderStatus()
+    deactivate server
+end
+
+deactivate ice
+@enduml

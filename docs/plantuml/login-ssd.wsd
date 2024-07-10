@@ -1,0 +1,32 @@
+@startuml
+actor User as user
+participant "ClientHandler\nJavascript" as javascript
+participant "Server\nClient Exchange Port" as server
+participant "Database" as db
+
+user -> javascript: login(username, password)
+
+group Input Validation [failed]
+    javascript --> user: displayError()
+    activate javascript #red
+else passed
+    javascript -> server: login(username, password)
+    activate server #blue
+    server -> db: findByUsernameAndPassword(username, password)
+end
+
+group Input Validation [failed]
+    db --> server: user := null
+    server --> javascript: invalid input
+    javascript --> user: displayError()
+else passed
+    server -> server: user := (username, name, password)
+    server -> server: token := generateToken(user)
+    server -> javascript: token
+    deactivate server
+    javascript -> user: saveToken(token)
+    deactivate javascript
+end
+
+deactivate javascript
+@enduml

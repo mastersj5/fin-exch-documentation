@@ -1,0 +1,16 @@
+@startuml
+!$BGCOLOR="black"
+
+!include https://raw.githubusercontent.com/bschwarz/puml-themes/master/themes/cyborg/puml-theme-cyborg.puml
+
+left to right direction
+actor User as "End User"
+rectangle "Iceberg UI" {
+  (Retrieve User Info) as (RetrieveData) 
+  (Submit Order) as (SubmitData)
+}
+
+User --> (RetrieveData) : Performs GET Request
+User --> (SubmitData) : Performs POST Request
+
+@enduml

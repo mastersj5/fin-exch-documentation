@@ -1,0 +1,20 @@
+@startuml
+!$BGCOLOR="black"
+
+!include https://raw.githubusercontent.com/bschwarz/puml-themes/master/themes/cyborg/puml-theme-cyborg.puml
+
+left to right direction
+actor "Other Microservices" as Microservices
+
+rectangle "Event Stream Sequencer" {
+  (Process Commands) as (ProcessCommands)
+  (Update Objects) as (UpdateObjects)
+  (Emit Events) as (EmitEvents)
+}
+
+Microservices --> (ProcessCommands) : Sends Command
+(ProcessCommands) --> (UpdateObjects) : Identifies Object
+(UpdateObjects) --> (EmitEvents) : Updates State
+(EmitEvents) --> Microservices : Sends Event
+
+@enduml

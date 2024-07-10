@@ -1,0 +1,79 @@
+@startuml
+actor User as user
+participant "Iceberg UI" as ice
+participant "Client\nExchange Port" as server
+participant "Kafka\nCommand Channel" as command
+participant "Event Stream\nSequencer" as ess
+participant "Kafka\nEvent Channel" as event
+participant "Matching\nEngine" as mem
+participant "Database\nWriter" as writer
+participant "DataLayer\nMongoDB" as db
+
+user -> ice: submit()
+
+group Input Validation [failed]
+    ice--> user: displayError()
+    activate ice#red
+else passed
+    ice-> server: cancelOrder(orderID)
+    activate server #blue
+
+    server -> server: header := ("CEM", CSN, LocalDateTime.now(),\n FinExCommandType.CancelOrder, orderID)
+    activate command #lightblue
+    server -> command: SendCommand(header)
+
+    activate ess #blue
+    command <- ess: listen(message)
+    ess -> ess: commandHeader :=\n deSerializeObjectFromByteArray(message)
+    ess -> ess: orderID := commandHeader.getContent()
+    ess -> ess: eventHeader :=(commandHeader, ESN, FinExEventType.PendingOrderCancel)
+    ess -> event: SendEvent(eventHeader)
+    activate event #lightblue
+
+
+
+    activate mem #blue
+    event <- mem: listen(message)
+
+
+    mem-> mem: eventHeader :=\n deSerializeObjectFromByteArray(message)
+    mem-> mem: orderID := eventHeader.getContent()
+    mem-> mem: order = ordersArray.get(orderID)
+    mem-> mem: books.get(order.getProductID()).cancelOrder(order
+    mem-> mem: commandHeader := ("MEM", CSN, LocalDateTime.now(),\n FinExCommandType.CancelOrder, orderID);
+    mem-> command: SendCommand (    commandHeader)
+
+
+
+    command <- ess: listen(message)
+    ess -> ess: commandHeader :=\n deSerializeObjectFromByteArray(message)
+    ess -> ess: orderID := commandHeader.getContent()
+    ess -> ess: header := (commandHeader, ESN,\n FinExCommandType.orderCancelled, orderID)
+    ess -> event: SendEvent(header)
+
+
+    activate writer #blue
+    event <- writer: listen(message)
+
+
+    writer -> writer: eventHeader :=\n deSerializeObjectFromByteArray(message)
+    writer -> writer: orderID := eventHeader.getContent()
+    writer -> db: UpdaterOrder(OrderCancelled, orderID)
+
+
+    server -> event: CheckEvent("CEM", CSN)
+
+    deactivate mem
+    deactivate command
+    deactivate ess
+    deactivate event
+    deactivate writer
+
+
+    server --> ice: order updated
+    ice--> user: displayOrderStatus()
+    deactivate server
+end
+
+deactivate ice
+@enduml

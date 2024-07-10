@@ -1,0 +1,22 @@
+@startuml
+!$BGCOLOR="black"
+!include https://raw.githubusercontent.com/bschwarz/puml-themes/master/themes/cyborg/puml-theme-cyborg.puml
+ 
+Actor User
+    participant "Iceberg UI" as UI
+    participant "Client Exchange Microservice" as CEM
+    participant "Event Stream Sequencer" as ESS
+
+    User -> UI: Request user info
+    UI -> CEM: GET /api/user/getUserInfo
+    CEM -> UI: Respond with user info
+    UI -> User: Display user info
+
+
+    User -> UI: Submit order
+    UI -> CEM: POST /api/order/submitOrder with order data
+    CEM -> ESS: Forward order data
+    ESS -> CEM: Process and respond with order status
+    CEM -> UI: Respond with order submission status
+    UI -> User: Display order status
+@enduml
